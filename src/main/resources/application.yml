@@ -1,0 +1,59 @@
+# Puerta de entrada unica para la web y la app movil.
+# Cada servicio se publica bajo su propio prefijo, que se quita antes de reenviar:
+#   /tenant/api/auth/login  ->  http://localhost:8081/api/auth/login
+server:
+  port: ${PORT:8090}
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 3000
+        response-timeout: 60s
+      # El gateway es el unico que responde CORS. Se quita el Origin antes de reenviar para que los
+      # servicios no apliquen su propia lista de origenes (solo localhost) a dominios de produccion.
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowed-origin-patterns: ${GATEWAY_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}
+            allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+            allowed-headers: "*"
+            exposed-headers: "*"
+            max-age: 3600
+      default-filters:
+        - RemoveRequestHeader=Origin
+      routes:
+        - id: tenant
+          uri: ${TENANT_SERVICE_URL:http://localhost:8081}
+          predicates: [ "Path=/tenant/**" ]
+          filters: [ "StripPrefix=1" ]
+          metadata: { name: "El servicio de usuarios y configuración" }
+        - id: operation
+          uri: ${PARKING_OPERATION_SERVICE_URL:http://localhost:8082}
+          predicates: [ "Path=/operation/**" ]
+          filters: [ "StripPrefix=1" ]
+          metadata: { name: "El servicio de operación" }
+        - id: pricing
+          uri: ${PRICING_SERVICE_URL:http://localhost:8083}
+          predicates: [ "Path=/pricing/**" ]
+          filters: [ "StripPrefix=1" ]
+          metadata: { name: "El servicio de tarifas" }
+        - id: payment
+          uri: ${PAYMENT_CASH_SERVICE_URL:http://localhost:8084}
+          predicates: [ "Path=/payment/**" ]
+          filters: [ "StripPrefix=1" ]
+          metadata: { name: "El servicio de caja" }
+        - id: reporting
+          uri: ${REPORTING_AUDIT_SERVICE_URL:http://localhost:8085}
+          predicates: [ "Path=/reporting/**" ]
+          filters: [ "StripPrefix=1" ]
+          metadata: { name: "El servicio de reportes" }
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
